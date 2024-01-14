@@ -11,7 +11,7 @@ async fn main() -> Result<(), std::io::Error> {
     let api_swagger = api_service.swagger_ui();
 
     let server_routes = Route::new()
-        .nest("/", StaticFilesEndpoint::new("./assets"))
+        .nest("/", StaticFilesEndpoint::new("./assets").index_file("index.html"))
         .nest("/api", api_service)
         .nest("/api/docs", api_swagger);
 
