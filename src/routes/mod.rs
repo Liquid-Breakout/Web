@@ -81,7 +81,7 @@ impl Routes {
     }
 
     #[oai(path = "/maptest/id/number", method = "get")]
-    pub async fn get_number_id(&self, api_key: Header<Option<String>>, id: Query<Option<u64>>) -> Result<IdResponse> {
+    pub async fn get_number_id(&self, api_key: Header<Option<String>>, id: Query<Option<String>>) -> Result<IdResponse> {
         let authorized = self.authorized(api_key).await;
         if !authorized {
             return Ok(IdResponse::Unauthorized)
@@ -91,9 +91,9 @@ impl Routes {
             Some(i) => i,
             None => return Ok(IdResponse::InvalidId),
         };
-        let result = self.backend.get_shareable_id(id.to_string());
+        let result = self.backend.get_number_id(id);
         match result {
-            Ok(share_id) => Ok(IdResponse::Ok(PlainText(share_id))),
+            Ok(id) => Ok(IdResponse::Ok(PlainText(id.to_string()))),
             Err(e) => Ok(IdResponse::ServerError(PlainText((*e).to_string())))
         }
     }
