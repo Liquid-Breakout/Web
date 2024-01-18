@@ -1,4 +1,18 @@
-use poem_openapi::{payload::Json, payload::PlainText, ApiResponse, Object};
+use poem_openapi::{payload::Json, payload::PlainText, ApiResponse, Object, Tags};
+
+// Tags
+#[derive(Tags)]
+#[allow(dead_code)]
+pub enum ApiTags {
+    #[oai(rename = "Map Test Operation")]
+    MapTestOperation,
+    #[oai(rename = "Map Test - Map Hub")]
+    MapTestMapHub,
+    #[oai(rename = "Map Test - ID System")]
+    MapTestIdSystem,
+    #[oai(rename = "Ingame Moderation")]
+    Moderation
+}
 
 // Map Test's Whitelist route
 #[derive(Object)]

@@ -30,7 +30,7 @@ impl Routes {
     }
 
     // Map Test Whitelist
-    #[oai(path = "/maptest/whitelist", method = "post")]
+    #[oai(path = "/maptest/whitelist", method = "post", tag = structs::ApiTags::MapTestOperation)]
     pub async fn whitelist(&self, asset_id: Query<Option<u64>>) -> Result<WhitelistResponse> {
         let asset_id = match asset_id.0 {
             None => return Ok(WhitelistResponse::BadRequest(
@@ -67,7 +67,7 @@ impl Routes {
     }
 
     // Map Test ID System
-    #[oai(path = "/maptest/id/share", method = "get")]
+    #[oai(path = "/maptest/id/share", method = "get", tag = structs::ApiTags::MapTestIdSystem)]
     pub async fn get_shareable_id(&self, id: Query<Option<u64>>) -> Result<IdResponse> {
         let id = match id.0 {
             None => return Ok(IdResponse::InvalidId),
@@ -80,7 +80,7 @@ impl Routes {
         }
     }
 
-    #[oai(path = "/maptest/id/number", method = "get")]
+    #[oai(path = "/maptest/id/number", method = "get", tag = structs::ApiTags::MapTestIdSystem)]
     pub async fn get_number_id(&self, api_key: Header<Option<String>>, id: Query<Option<String>>) -> Result<IdResponse> {
         let authorized = self.authorized(api_key).await;
         if !authorized {
@@ -99,17 +99,17 @@ impl Routes {
     }
 
     // Map Test Map Hub System
-    #[oai(path = "/maptest/hub/fetch", method = "get")]
+    #[oai(path = "/maptest/hub/fetch", method = "get", tag = structs::ApiTags::MapTestMapHub)]
     pub async fn fetch_maphub_data(&self) {
 
     }
 
-    #[oai(path = "/maptest/hub/publish", method = "post")]
+    #[oai(path = "/maptest/hub/publish", method = "post", tag = structs::ApiTags::MapTestMapHub)]
     pub async fn publish_to_maphub(&self) {
 
     }
 
-    #[oai(path = "/maptest/hub/validatehash", method = "post")]
+    #[oai(path = "/maptest/hub/validatehash", method = "post", tag = structs::ApiTags::MapTestMapHub)]
     pub async fn validate_hash_with_maphub(&self) {
 
     }
