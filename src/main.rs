@@ -22,7 +22,7 @@ async fn main() -> Result<(), std::io::Error> {
             "0123456789".to_string()
         ]
     );
-    let connect_result = backend.connect_mongodb(mongodb_url).await;
+    let connect_result = backend.connect_mongodb(mongodb_url, None).await;
     match connect_result {
         Ok(_) => {},
         Err(e) => panic!("Server cannot start: Failed to connect to MongoDB, reason: {}", (*e).to_string())
