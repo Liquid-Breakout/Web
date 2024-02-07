@@ -1043,7 +1043,7 @@ checksum = "01cda141df6706de531b6c46c3a33ecca755538219bd484262fa09410c13539c"
 [[package]]
 name = "liquid_breakout_backend"
 version = "0.0.1"
-source = "git+https://github.com/Liquid-Breakout/Backend.git#9f7bb355211cf4e69b6ef61590033b3b41e04e4b"
+source = "git+https://github.com/Liquid-Breakout/Backend.git#c279d8530bbe8aba4575f247775c212d00015093"
 dependencies = [
  "chrono",
  "dotenv",
@@ -1053,6 +1053,7 @@ dependencies = [
  "roboat",
  "serde",
  "serde_json",
+ "serde_repr",
 ]
 
 [[package]]
@@ -1920,6 +1921,17 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_repr"
+version = "0.1.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b2e6b945e9d3df726b65d6ee24060aff8e3533d431f677a9695db04eff9dfdb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
 ]
 
 [[package]]
