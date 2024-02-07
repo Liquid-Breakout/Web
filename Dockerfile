@@ -19,4 +19,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/target/release/liquid_breakout_web ./
+COPY --from=build /app/assets ./
 USER root
+ENTRYPOINT ["./liquid_breakout_web"]
