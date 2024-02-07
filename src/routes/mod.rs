@@ -1,12 +1,19 @@
 use poem::Result;
 use poem_openapi::{param::Query, param::Header, payload::Json, payload::PlainText, OpenApi};
 use liquid_breakout_backend::Backend;
-use structs::{IdResponse, WhitelistInfo, WhitelistResponse};
+use structs::{BanEntryObject, BanListResponse, IdResponse, WhitelistInfo, WhitelistResponse};
+
+use self::structs::BanResponse;
 
 mod structs;
 
 pub struct Routes {
     backend: Backend
+}
+
+fn unbox_error(box_var: Box<dyn std::error::Error>) -> String {
+    let unboxed = (*box_var).to_string();
+    unboxed
 }
 
 #[OpenApi]
@@ -27,6 +34,85 @@ impl Routes {
             },
             Err(_) => return false,
         };
+    }
+
+    // Moderation System
+    #[oai(path = "/moderation/ban/list", method = "get", tag = structs::ApiTags::Moderation)]
+    pub async fn fetch_ban_list(&self) -> Result<BanListResponse> {
+        let result = self.backend.get_ban_collection().await;
+        match result {
+            Ok(entries) => {
+                // this is ugly, i wish there's a way to not do this
+                let mut response_entries: Vec<BanEntryObject> = vec![];
+                for entry in entries.into_iter() {
+                    response_entries.push(BanEntryObject {
+                        user_id: entry.user_id,
+                        banned_time: entry.banned_time,
+                        banned_until: entry.banned_until,
+                        moderator: entry.moderator,
+                        reason: entry.reason
+                    })
+                }
+
+                Ok(BanListResponse::Ok(
+                    Json(response_entries)
+                ))
+            },
+            Err(e) => Ok(BanListResponse::ServerError(PlainText(unbox_error(e))))
+        }
+    }
+
+    #[oai(path = "/moderation/ban", method = "post", tag = structs::ApiTags::Moderation)]
+    pub async fn ban_player(&self, api_key: Header<Option<String>>, user_id: Query<Option<u64>>, duration: Query<Option<i32>>, moderator: Query<Option<String>>, reason: Query<Option<String>>) -> Result<BanResponse> {
+        let authorized = self.authorized(api_key).await;
+        if !authorized {
+            return Ok(BanResponse::Unauthorized)
+        }
+
+        let user_id = match user_id.0 {
+            Some(i) => i,
+            None => return Ok(BanResponse::InvalidUser(PlainText("Query `user_id` is not a number (u64).".to_string()))),
+        };
+        let duration_in_minutes = match duration.0 {
+            Some(i) => i,
+            None => return Ok(BanResponse::InvalidDuration(PlainText("Query `duration` is not a number (i32).".to_string()))),
+        };
+        if duration_in_minutes < 0 && duration_in_minutes != -1 {
+            return Ok(BanResponse::InvalidDuration(PlainText("`duration` can only be positive or -1.".to_string())))
+        }
+        let moderator = match moderator.0 {
+            Some(i) => i,
+            None => return Ok(BanResponse::InvalidString(PlainText("Query `moderator` is not a String.".to_string()))),
+        };
+        let reason = match reason.0 {
+            Some(i) => i,
+            None => return Ok(BanResponse::InvalidString(PlainText("Query `reason` is not a String.".to_string()))),
+        };
+
+        let result = self.backend.ban_player(user_id, duration_in_minutes, &moderator, &reason).await;
+        match result {
+            Ok(_) => Ok(BanResponse::Ok),
+            Err(e) => Ok(BanResponse::ServerError(PlainText(unbox_error(e))))
+        }
+    }
+
+    #[oai(path = "/moderation/unban", method = "post", tag = structs::ApiTags::Moderation)]
+    pub async fn unban_player(&self, api_key: Header<Option<String>>, user_id: Query<Option<u64>>) -> Result<BanResponse> {
+        let authorized = self.authorized(api_key).await;
+        if !authorized {
+            return Ok(BanResponse::Unauthorized)
+        }
+
+        let user_id = match user_id.0 {
+            Some(i) => i,
+            None => return Ok(BanResponse::InvalidUser(PlainText("Query `user_id` is not a number (u64).".to_string()))),
+        };
+
+        let result = self.backend.unban_player(user_id).await;
+        match result {
+            Ok(_) => Ok(BanResponse::Ok),
+            Err(e) => Ok(BanResponse::ServerError(PlainText(unbox_error(e))))
+        }
     }
 
     // Map Test Whitelist
@@ -59,7 +145,7 @@ impl Routes {
             Err(e) => Ok(WhitelistResponse::ServerError(Json(
                 WhitelistInfo {
                     success: false,
-                    error: Some((*e).to_string()),
+                    error: Some(unbox_error(e)),
                     share_id: None   
                 }
             )))
@@ -76,7 +162,7 @@ impl Routes {
         let result = self.backend.get_shareable_id(id.to_string());
         match result {
             Ok(share_id) => Ok(IdResponse::Ok(PlainText(share_id))),
-            Err(e) => Ok(IdResponse::ServerError(PlainText((*e).to_string())))
+            Err(e) => Ok(IdResponse::ServerError(PlainText(unbox_error(e))))
         }
     }
 
@@ -94,7 +180,7 @@ impl Routes {
         let result = self.backend.get_number_id(id);
         match result {
             Ok(id) => Ok(IdResponse::Ok(PlainText(id.to_string()))),
-            Err(e) => Ok(IdResponse::ServerError(PlainText((*e).to_string())))
+            Err(e) => Ok(IdResponse::ServerError(PlainText(unbox_error(e))))
         }
     }
 

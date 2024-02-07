@@ -14,6 +14,45 @@ pub enum ApiTags {
     Moderation
 }
 
+#[derive(Object)]
+pub struct BanEntryObject {
+    pub user_id: i64,
+    pub banned_time: i64,
+    pub banned_until: i64,
+    pub moderator: String,
+    pub reason: String,
+}
+
+// Moderation's Ban List
+#[derive(ApiResponse)]
+pub enum BanListResponse {
+    #[oai(status = 200)]
+    Ok(Json<Vec<BanEntryObject>>),
+
+    #[oai(status = 500)]
+    ServerError(PlainText<String>)
+}
+
+// Moderation's Ban and Unban
+#[derive(ApiResponse)]
+pub enum BanResponse {
+    #[oai(status = 200)]
+    Ok,
+
+    #[oai(status = 400)]
+    InvalidUser(PlainText<String>),
+    #[oai(status = 400)]
+    InvalidDuration(PlainText<String>),
+    #[oai(status = 400)]
+    InvalidString(PlainText<String>),
+
+    #[oai(status = 401)]
+    Unauthorized,
+
+    #[oai(status = 500)]
+    ServerError(PlainText<String>)
+}
+
 // Map Test's Whitelist route
 #[derive(Object)]
 pub struct WhitelistInfo {
