@@ -117,7 +117,7 @@ impl Routes {
 
     // Map Test Whitelist
     #[oai(path = "/maptest/whitelist", method = "post", tag = structs::ApiTags::MapTestOperation)]
-    pub async fn whitelist(&self, asset_id: Query<Option<u64>>) -> Result<WhitelistResponse> {
+    pub async fn whitelist(&self, asset_id: Query<Option<u64>>, user_id: Query<Option<u64>>) -> Result<WhitelistResponse> {
         let asset_id = match asset_id.0 {
             None => return Ok(WhitelistResponse::BadRequest(
                 Json(
@@ -130,8 +130,31 @@ impl Routes {
             )),
             Some(b) => b,
         };
+        let user_id = match user_id.0 {
+            None => return Ok(WhitelistResponse::BadRequest(
+                Json(
+                    WhitelistInfo {
+                        success: false,
+                        error: Some("Invalid User ID.".to_string()),
+                        share_id: None   
+                    }
+                )
+            )),
+            Some(b) => b,
+        };
+        if user_id <= 0 {
+            return Ok(WhitelistResponse::BadRequest(
+                Json(
+                    WhitelistInfo {
+                        success: false,
+                        error: Some("Invalid User ID.".to_string()),
+                        share_id: None   
+                    }
+                )
+            ))
+        }
 
-        let result = self.backend.whitelist_asset(asset_id, 0).await;
+        let result = self.backend.whitelist_asset(asset_id, user_id).await;
         match result {
             Ok(_) => Ok(WhitelistResponse::Ok(
                 Json(
