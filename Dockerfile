@@ -1,5 +1,8 @@
 FROM rust:slim-buster as build
 
+ARG GITHUB_ID
+ENV GITHUB_ID=$GITHUB_ID
+
 WORKDIR /app
 
 COPY . /app
@@ -7,6 +10,14 @@ USER root
 
 RUN apt-get update
 RUN apt-get install libssl-dev pkg-config -y
+
+RUN --mount=type=secret,id=TOKEN \
+    echo "machine github.com login x password $(head -n 1 /run/secrets/TOKEN)" > ~/.netrc && \
+git config \
+    --global \
+    url."https://${GITHUB_ID}:${TOKEN}@github.com/".insteadOf \
+    "https://github.com/"
+
 RUN cargo build --release
 
 # Copy the binary into a new container for a smaller docker image
