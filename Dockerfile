@@ -9,7 +9,7 @@ COPY . /app
 USER root
 
 RUN apt-get update
-RUN apt-get install libssl-dev pkg-config -y
+RUN apt-get install libssl-dev pkg-config git -y
 
 RUN --mount=type=secret,id=TOKEN \
     echo "machine github.com login x password $(head -n 1 /run/secrets/TOKEN)" > ~/.netrc && \
