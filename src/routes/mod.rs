@@ -36,6 +36,12 @@ impl Routes {
         };
     }
 
+    // Index page
+    #[oai(path = "/", method = "get")]
+    pub async fn index(&self) -> PlainText<&'static str> {
+        PlainText("Welcome to Liquid Breakout Backend site. Visit /docs for documentation.")
+    }
+
     // Moderation System
     #[oai(path = "/moderation/ban/list", method = "get", tag = structs::ApiTags::Moderation)]
     pub async fn fetch_ban_list(&self) -> Result<BanListResponse> {

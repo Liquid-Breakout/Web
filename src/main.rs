@@ -35,9 +35,8 @@ async fn main() -> Result<(), std::io::Error> {
     let api_swagger = api_service.swagger_ui();
 
     let server_routes = Route::new()
-        .nest("/", StaticFilesEndpoint::new("./assets").index_file("index.html"))
-        .nest("/api", api_service)
-        .nest("/api/docs", api_swagger);
+        .nest("/", api_service)
+        .nest("/docs", api_swagger);
 
     println!("Starting Server, listening at port: 3000");
 
