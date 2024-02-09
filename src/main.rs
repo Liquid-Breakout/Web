@@ -1,7 +1,7 @@
 use std::env;
-use poem::{endpoint::StaticFilesEndpoint, listener::TcpListener, Route};
+use poem::{listener::TcpListener, Route};
 use poem_openapi::OpenApiService;
-use routes::Routes;
+use routes::{apis::ApiRoutes, generic::GenericRoutes};
 
 use liquid_breakout_backend::Backend;
 
@@ -28,14 +28,16 @@ async fn main() -> Result<(), std::io::Error> {
         Err(e) => panic!("Server cannot start: Failed to connect to MongoDB, reason: {}", (*e).to_string())
     }
 
-    let routes = Routes::new(backend);
+    let generic_routes = GenericRoutes::new();
+    let api_routes = ApiRoutes::new(backend, &generic_routes);
 
-    let api_service = OpenApiService::new(routes, "Liquid Breakout API", "0.0.1")
+    let api_service = OpenApiService::new(api_routes, "Liquid Breakout API", "0.0.1")
         .server("https://api.liquidbreakout.com");
     let api_swagger = api_service.swagger_ui();
 
     let server_routes = Route::new()
         .nest("/", api_service)
+        .nest("/", generic_routes.collect())
         .nest("/docs", api_swagger);
 
     println!("Starting Server, listening at port: 3000");
