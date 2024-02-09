@@ -39,13 +39,13 @@ impl ApiRoutes {
     }
 
     // IO-related
-    /*#[oai(path = "/v1/websocket/io/send", method = "post")]
+    /*#[oai(path = "/websocket/io/send", method = "post")]
     pub async fn io_send(&self, action: Header<String>, bgm: Query<Option<String>>, ) -> PlainText<&'static str> {
         PlainText("Welcome to Liquid Breakout Backend site. Visit /docs for documentation.")
     }*/
 
     // Moderation System
-    #[oai(path = "/v1/moderation/ban/list", method = "get", tag = ApiTags::Moderation)]
+    #[oai(path = "/moderation/ban/list", method = "get", tag = ApiTags::Moderation)]
     pub async fn fetch_ban_list(&self) -> Result<BanListResponse> {
         let result = self.backend.get_ban_collection().await;
         match result {
@@ -70,7 +70,7 @@ impl ApiRoutes {
         }
     }
 
-    #[oai(path = "/v1/moderation/ban", method = "post", tag = ApiTags::Moderation)]
+    #[oai(path = "/moderation/ban", method = "post", tag = ApiTags::Moderation)]
     pub async fn ban_player(&self, api_key: ApiKeyAuthorization, user_id: Query<Option<u64>>, duration: Query<Option<i32>>, moderator: Query<Option<String>>, reason: Query<Option<String>>) -> Result<BanResponse> {
         let authorized = self.authorized(api_key.0).await;
         if !authorized {
@@ -104,7 +104,7 @@ impl ApiRoutes {
         }
     }
 
-    #[oai(path = "/v1/moderation/unban", method = "post", tag = ApiTags::Moderation)]
+    #[oai(path = "/moderation/unban", method = "post", tag = ApiTags::Moderation)]
     pub async fn unban_player(&self, api_key: ApiKeyAuthorization, user_id: Query<Option<u64>>) -> Result<BanResponse> {
         let authorized = self.authorized(api_key.0).await;
         if !authorized {
@@ -124,7 +124,7 @@ impl ApiRoutes {
     }
 
     // Map Test Whitelist
-    #[oai(path = "/v1/maptest/whitelist", method = "post", tag = ApiTags::MapTestOperation)]
+    #[oai(path = "/maptest/whitelist", method = "post", tag = ApiTags::MapTestOperation)]
     pub async fn whitelist(&self, asset_id: Query<Option<u64>>, user_id: Query<Option<u64>>) -> Result<WhitelistResponse> {
         let asset_id = match asset_id.0 {
             None => return Ok(WhitelistResponse::BadRequest(
@@ -184,7 +184,7 @@ impl ApiRoutes {
     }
 
     // Map Test ID System
-    #[oai(path = "/v1/maptest/id/share", method = "get", tag = ApiTags::MapTestIdSystem)]
+    #[oai(path = "/maptest/id/share", method = "get", tag = ApiTags::MapTestIdSystem)]
     pub async fn get_shareable_id(&self, id: Query<Option<u64>>) -> Result<IdResponse> {
         let id = match id.0 {
             None => return Ok(IdResponse::InvalidId),
@@ -197,7 +197,7 @@ impl ApiRoutes {
         }
     }
 
-    #[oai(path = "/v1/maptest/id/number", method = "get", tag = ApiTags::MapTestIdSystem)]
+    #[oai(path = "/maptest/id/number", method = "get", tag = ApiTags::MapTestIdSystem)]
     pub async fn get_number_id(&self, api_key: ApiKeyAuthorization, id: Query<Option<String>>) -> Result<IdResponse> {
         let authorized = self.authorized(api_key.0).await;
         if !authorized {
@@ -216,17 +216,17 @@ impl ApiRoutes {
     }
 
     // Map Test Map Hub System
-    #[oai(path = "/v1/maptest/hub/fetch", method = "get", tag = ApiTags::MapTestMapHub)]
+    #[oai(path = "/maptest/hub/fetch", method = "get", tag = ApiTags::MapTestMapHub)]
     pub async fn fetch_maphub_data(&self) {
 
     }
 
-    #[oai(path = "/v1/maptest/hub/publish", method = "post", tag = ApiTags::MapTestMapHub)]
+    #[oai(path = "/maptest/hub/publish", method = "post", tag = ApiTags::MapTestMapHub)]
     pub async fn publish_to_maphub(&self) {
 
     }
 
-    #[oai(path = "/v1/maptest/hub/validatehash", method = "post", tag = ApiTags::MapTestMapHub)]
+    #[oai(path = "/maptest/hub/validatehash", method = "post", tag = ApiTags::MapTestMapHub)]
     pub async fn validate_hash_with_maphub(&self) {
 
     }

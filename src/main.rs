@@ -32,7 +32,7 @@ async fn main() -> Result<(), std::io::Error> {
     let api_routes = ApiRoutes::new(backend, &generic_routes);
 
     let api_service = OpenApiService::new(api_routes, "Liquid Breakout API", "0.0.1")
-        .server("https://api.liquidbreakout.com");
+        .server("https://api.liquidbreakout.com/v1");
     let api_swagger = api_service.swagger_ui();
 
     let server_routes = Route::new()
