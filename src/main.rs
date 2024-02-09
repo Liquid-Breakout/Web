@@ -32,12 +32,12 @@ async fn main() -> Result<(), std::io::Error> {
     let api_routes = ApiRoutes::new(backend, &generic_routes);
 
     let api_service = OpenApiService::new(api_routes, "Liquid Breakout API", "0.0.1")
-        .server("https://api.liquidbreakout.com");
+        .server("https://api.liquidbreakout.com/v1");
     let api_swagger = api_service.swagger_ui();
 
     let server_routes = Route::new()
-        .nest("/", api_service)
         .nest("/", generic_routes.collect())
+        .nest("/v1", api_service)
         .nest("/docs", api_swagger);
 
     println!("Starting Server, listening at port: 3000");
