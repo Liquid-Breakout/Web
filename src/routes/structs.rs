@@ -53,7 +53,7 @@ pub enum BanResponse {
     ServerError(PlainText<String>)
 }
 
-// Map Test's Whitelist route
+// Map Test's Whitelist
 #[derive(Object)]
 pub struct WhitelistInfo {
     pub success: bool,
@@ -71,6 +71,43 @@ pub enum WhitelistResponse {
 
     #[oai(status = 500)]
     ServerError(Json<WhitelistInfo>)
+}
+
+// Map Test's Scan Map
+#[derive(Object)]
+pub struct MaliciousScriptEntry {
+    pub script: String,
+    pub line: u64,
+    pub column: u64,
+    pub reason: String
+}
+
+#[derive(Object)]
+pub struct ScanMapResult {
+    pub is_malicious: bool,
+    pub scripts: Vec<MaliciousScriptEntry>
+}
+
+#[derive(Object)]
+pub struct ScanMapInfo {
+    pub success: bool,
+    pub result: Option<ScanMapResult>,
+    pub error: Option<String>
+}
+
+#[derive(ApiResponse)]
+pub enum ScanMapResponse {
+    #[oai(status = 200)]
+    Ok(Json<ScanMapInfo>),
+
+    #[oai(status = 400)]
+    InvalidId(Json<ScanMapInfo>),
+
+    #[oai(status = 401)]
+    Unauthorized,
+
+    #[oai(status = 500)]
+    ServerError(Json<ScanMapInfo>)
 }
 
 // Map Test's ID system routes

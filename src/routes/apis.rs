@@ -1,8 +1,10 @@
+use full_moon::ast::Suffix;
 use poem::Result;
-use poem_openapi::{auth::ApiKey, param::Query, param::Header, payload::Json, payload::PlainText, OpenApi, SecurityScheme};
+use poem_openapi::{auth::ApiKey, param::Query, payload::Json, payload::PlainText, OpenApi, SecurityScheme};
+use line_col::LineColLookup;
 use liquid_breakout_backend::Backend;
 use super::generic::{GenericRoutes, WebsocketIoQueue};
-use super::structs::{ApiTags, BanEntryObject, BanResponse, BanListResponse, IdResponse, WhitelistInfo, WhitelistResponse};
+use super::structs::{ApiTags, BanEntryObject, BanListResponse, BanResponse, IdResponse, MaliciousScriptEntry, ScanMapInfo, ScanMapResponse, ScanMapResult, WhitelistInfo, WhitelistResponse};
 
 pub struct ApiRoutes {
     backend: Backend,
@@ -121,6 +123,129 @@ impl ApiRoutes {
             Ok(_) => Ok(BanResponse::Ok),
             Err(e) => Ok(BanResponse::ServerError(PlainText(unbox_error(e))))
         }
+    }
+
+    // Map Test Scan Model
+    #[oai(path = "/maptest/scanmap", method = "post", tag = ApiTags::MapTestOperation)]
+    pub async fn scan_map(&self, api_key: ApiKeyAuthorization, asset_id: Query<Option<u64>>) -> Result<ScanMapResponse> {
+        let authorized = self.authorized(api_key.0).await;
+        if !authorized {
+            return Ok(ScanMapResponse::Unauthorized)
+        }
+
+        let asset_id = match asset_id.0 {
+            None => return Ok(ScanMapResponse::InvalidId(
+                Json(
+                    ScanMapInfo {
+                        success: false,
+                        result: None,
+                        error: Some("Invalid Asset ID.".to_string()) 
+                    }
+                )
+            )),
+            Some(b) => b,
+        };
+
+        let bytes = match self.backend.download_asset_bytes(asset_id).await {
+            Ok(bytes) => bytes,
+            Err(e) => return Ok(ScanMapResponse::ServerError(Json(
+                ScanMapInfo {
+                    success: false,
+                    result: None,
+                    error: Some(unbox_error(e))
+                }
+            )))
+        };
+
+        let dom = match self.backend.dom_from_bytes(bytes) {
+            Ok(dom) => dom,
+            Err(e) => return Ok(ScanMapResponse::ServerError(Json(
+                ScanMapInfo {
+                    success: false,
+                    result: None,
+                    error: Some(unbox_error(e))
+                }
+            )))
+        };
+
+        let scripts = self.backend.dom_find_scripts(&dom);
+        let mut result: Vec<MaliciousScriptEntry> = Vec::new();
+
+        for (location, src) in scripts.into_iter() {
+            let ast = match self.backend.luau_ast_from_string(&src) {
+                Ok(ast) => ast,
+                Err(e) => return Ok(ScanMapResponse::ServerError(Json(
+                    ScanMapInfo {
+                        success: false,
+                        result: None,
+                        error: Some(unbox_error(e))
+                    }
+                )))
+            };
+            let lookup = LineColLookup::new(&src);
+
+            let found_getfenv = self.backend.luau_find_global_function_usage(&ast, "getfenv");
+            if !found_getfenv.is_empty() {
+                for ((pos, _), _) in found_getfenv.into_iter() {
+                    let (line, column) = lookup.get(pos);
+                    result.push(MaliciousScriptEntry {
+                        script: location.clone(),
+                        line: line as u64,
+                        column: column as u64,
+                        reason: "Detected `getfenv` usage, which is extremely forbidden as it's commonly used for malicious purposes.".to_string(),
+                    })
+                }
+            }
+
+            let found_setfenv = self.backend.luau_find_global_function_usage(&ast, "setfenv");
+            if !found_setfenv.is_empty() {
+                for ((pos, _), _) in found_setfenv.into_iter() {
+                    let (line, column) = lookup.get(pos);
+                    result.push(MaliciousScriptEntry {
+                        script: location.clone(),
+                        line: line as u64,
+                        column: column as u64,
+                        reason: "Detected `setfenv` usage, changing the script environment is not allowed.".to_string(),
+                    })
+                }
+            }
+
+            let found_require = self.backend.luau_find_global_function_usage(&ast, "require");
+            if !found_require.is_empty() {
+                for ((pos, _), suffixes) in found_require.into_iter() {
+                    if let Some(&suffix) = suffixes.first() {
+                        match suffix {
+                            Suffix::Index(index) => {
+                                match index.to_string().parse::<u64>() {
+                                    Ok(id) => {
+                                        let (line, column) = lookup.get(pos);
+                                        result.push(MaliciousScriptEntry {
+                                            script: location.clone(),
+                                            line: line as u64,
+                                            column: column as u64,
+                                            reason: format!("Detected requiring by id ({}). This is used to download malicious scripts, thus is not allowed.", id),
+                                        })
+                                    },
+                                    Err(_) => {}
+                                };
+                            },
+                            _ => {}
+                        };
+                    }
+                }
+            }
+        };
+
+        Ok(ScanMapResponse::Ok(Json(
+            ScanMapInfo {
+                success: true,
+                result: Some(ScanMapResult {
+                    is_malicious: !result.is_empty(),
+                    scripts: result
+                }),
+                error: None
+            }
+        )))
     }
 
     // Map Test Whitelist
