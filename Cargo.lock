@@ -1764,7 +1764,7 @@ checksum = "01cda141df6706de531b6c46c3a33ecca755538219bd484262fa09410c13539c"
 [[package]]
 name = "liquid_breakout_backend"
 version = "0.0.1"
-source = "git+https://github.com/Liquid-Breakout/Backend.git#b534988633c764950772eff68ed8044c2ca2880c"
+source = "git+https://github.com/Liquid-Breakout/Backend.git#05eed3747bc28d6d40cee1cfb54fb6e67f94452f"
 dependencies = [
  "chrono",
  "dotenv",
