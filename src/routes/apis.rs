@@ -4,7 +4,7 @@ use poem_openapi::{auth::ApiKey, param::Query, payload::Json, payload::PlainText
 use line_col::LineColLookup;
 use liquid_breakout_backend::Backend;
 use super::generic::{GenericRoutes, WebsocketIoQueue};
-use super::structs::{ApiTags, BanEntryObject, BanListResponse, BanResponse, IdResponse, MaliciousScriptEntry, ScanMapInfo, ScanMapResponse, ScanMapResult, WhitelistInfo, WhitelistResponse};
+use super::structs::{ApiTags, ApiError, BanEntryObject, BanListResponse, BanResponse, IdResponse, MaliciousScriptEntry, ScanMapInfo, ScanMapResponse, ScanMapResult, WhitelistInfo, WhitelistResponse};
 
 pub struct ApiRoutes {
     backend: Backend,
@@ -42,8 +42,8 @@ impl ApiRoutes {
 
     // IO-related
     /*#[oai(path = "/websocket/io/send", method = "post")]
-    pub async fn io_send(&self, action: Header<String>, bgm: Query<Option<String>>, ) -> PlainText<&'static str> {
-        PlainText("Welcome to Liquid Breakout Backend site. Visit /docs for documentation.")
+    pub async fn io_send(&self, action: Header<String>, bgm: Query<Option<String>>, ) {
+        
     }*/
 
     // Moderation System
@@ -68,7 +68,7 @@ impl ApiRoutes {
                     Json(response_entries)
                 ))
             },
-            Err(e) => Ok(BanListResponse::ServerError(PlainText(unbox_error(e))))
+            Err(e) => Ok(BanListResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         }
     }
 
@@ -81,28 +81,28 @@ impl ApiRoutes {
 
         let user_id = match user_id.0 {
             Some(i) => i,
-            None => return Ok(BanResponse::InvalidUser(PlainText("Query `user_id` is not a number (u64).".to_string()))),
+            None => return Ok(BanResponse::InvalidUser(Json(ApiError { error: "Query `user_id` is not a number (u64).".to_string() }))),
         };
         let duration_in_minutes = match duration.0 {
             Some(i) => i,
-            None => return Ok(BanResponse::InvalidDuration(PlainText("Query `duration` is not a number (i32).".to_string()))),
+            None => return Ok(BanResponse::InvalidDuration(Json(ApiError { error: "Query `duration` is not a number (i32).".to_string() }))),
         };
         if duration_in_minutes < 0 && duration_in_minutes != -1 {
-            return Ok(BanResponse::InvalidDuration(PlainText("`duration` can only be positive or -1.".to_string())))
+            return Ok(BanResponse::InvalidDuration(Json(ApiError { error: "`duration` can only be positive or -1.".to_string() })))
         }
         let moderator = match moderator.0 {
             Some(i) => i,
-            None => return Ok(BanResponse::InvalidString(PlainText("Query `moderator` is not a String.".to_string()))),
+            None => return Ok(BanResponse::InvalidString(Json(ApiError { error: "Query `moderator` is not a String.".to_string() }))),
         };
         let reason = match reason.0 {
             Some(i) => i,
-            None => return Ok(BanResponse::InvalidString(PlainText("Query `reason` is not a String.".to_string()))),
+            None => return Ok(BanResponse::InvalidString(Json(ApiError { error: "Query `reason` is not a String.".to_string() }))),
         };
 
         let result = self.backend.ban_player(user_id, duration_in_minutes, &moderator, &reason).await;
         match result {
             Ok(_) => Ok(BanResponse::Ok),
-            Err(e) => Ok(BanResponse::ServerError(PlainText(unbox_error(e))))
+            Err(e) => Ok(BanResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         }
     }
 
@@ -115,13 +115,13 @@ impl ApiRoutes {
 
         let user_id = match user_id.0 {
             Some(i) => i,
-            None => return Ok(BanResponse::InvalidUser(PlainText("Query `user_id` is not a number (u64).".to_string()))),
+            None => return Ok(BanResponse::InvalidUser(Json(ApiError { error: "Query `user_id` is not a number (u64).".to_string() }))),
         };
 
         let result = self.backend.unban_player(user_id).await;
         match result {
             Ok(_) => Ok(BanResponse::Ok),
-            Err(e) => Ok(BanResponse::ServerError(PlainText(unbox_error(e))))
+            Err(e) => Ok(BanResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         }
     }
 
@@ -134,38 +134,18 @@ impl ApiRoutes {
         }
 
         let asset_id = match asset_id.0 {
-            None => return Ok(ScanMapResponse::InvalidId(
-                Json(
-                    ScanMapInfo {
-                        success: false,
-                        result: None,
-                        error: Some("Invalid Asset ID.".to_string()) 
-                    }
-                )
-            )),
+            None => return Ok(ScanMapResponse::InvalidId(Json(ApiError { error: "Query `asset_id` is not a number (u64).".to_string() }))),
             Some(b) => b,
         };
 
         let bytes = match self.backend.download_asset_bytes(asset_id).await {
             Ok(bytes) => bytes,
-            Err(e) => return Ok(ScanMapResponse::ServerError(Json(
-                ScanMapInfo {
-                    success: false,
-                    result: None,
-                    error: Some(unbox_error(e))
-                }
-            )))
+            Err(e) => return Ok(ScanMapResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         };
 
         let dom = match self.backend.dom_from_bytes(bytes) {
             Ok(dom) => dom,
-            Err(e) => return Ok(ScanMapResponse::ServerError(Json(
-                ScanMapInfo {
-                    success: false,
-                    result: None,
-                    error: Some(unbox_error(e))
-                }
-            )))
+            Err(e) => return Ok(ScanMapResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         };
 
         let scripts = self.backend.dom_find_scripts(&dom);
@@ -174,13 +154,7 @@ impl ApiRoutes {
         for (location, src) in scripts.into_iter() {
             let ast = match self.backend.luau_ast_from_string(&src) {
                 Ok(ast) => ast,
-                Err(e) => return Ok(ScanMapResponse::ServerError(Json(
-                    ScanMapInfo {
-                        success: false,
-                        result: None,
-                        error: Some(unbox_error(e))
-                    }
-                )))
+                Err(e) => return Ok(ScanMapResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
             };
             let lookup = LineColLookup::new(&src);
 
@@ -238,12 +212,10 @@ impl ApiRoutes {
 
         Ok(ScanMapResponse::Ok(Json(
             ScanMapInfo {
-                success: true,
-                result: Some(ScanMapResult {
+                result: ScanMapResult {
                     is_malicious: !result.is_empty(),
                     scripts: result
-                }),
-                error: None
+                }
             }
         )))
     }
@@ -252,59 +224,21 @@ impl ApiRoutes {
     #[oai(path = "/maptest/whitelist", method = "post", tag = ApiTags::MapTestOperation)]
     pub async fn whitelist(&self, asset_id: Query<Option<u64>>, user_id: Query<Option<u64>>) -> Result<WhitelistResponse> {
         let asset_id = match asset_id.0 {
-            None => return Ok(WhitelistResponse::BadRequest(
-                Json(
-                    WhitelistInfo {
-                        success: false,
-                        error: Some("Invalid Asset ID.".to_string()),
-                        share_id: None   
-                    }
-                )
-            )),
+            None => return Ok(WhitelistResponse::BadRequest(Json(ApiError { error: "Query `asset_id` is not a number (u64).".to_string() }))),
             Some(b) => b,
         };
         let user_id = match user_id.0 {
-            None => return Ok(WhitelistResponse::BadRequest(
-                Json(
-                    WhitelistInfo {
-                        success: false,
-                        error: Some("Invalid User ID.".to_string()),
-                        share_id: None   
-                    }
-                )
-            )),
+            None => return Ok(WhitelistResponse::BadRequest(Json(ApiError { error: "Query `user_id` is not a number (u64).".to_string() }))),
             Some(b) => b,
         };
         if user_id <= 0 {
-            return Ok(WhitelistResponse::BadRequest(
-                Json(
-                    WhitelistInfo {
-                        success: false,
-                        error: Some("Invalid User ID.".to_string()),
-                        share_id: None   
-                    }
-                )
-            ))
+            return Ok(WhitelistResponse::BadRequest(Json(ApiError { error: "`user_id` cannot be negative or 0.".to_string() })))
         }
 
         let result = self.backend.whitelist_asset(asset_id, user_id).await;
         match result {
-            Ok(_) => Ok(WhitelistResponse::Ok(
-                Json(
-                    WhitelistInfo {
-                        success: true,
-                        error: None,
-                        share_id: Some(self.backend.get_shareable_id(asset_id.to_string()).unwrap())
-                    }
-                )
-            )),
-            Err(e) => Ok(WhitelistResponse::ServerError(Json(
-                WhitelistInfo {
-                    success: false,
-                    error: Some(unbox_error(e)),
-                    share_id: None   
-                }
-            )))
+            Ok(_) => Ok(WhitelistResponse::Ok(Json(WhitelistInfo { share_id: self.backend.get_shareable_id(asset_id.to_string()).unwrap() }))),
+            Err(e) => Ok(WhitelistResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         }
     }
 
@@ -312,13 +246,13 @@ impl ApiRoutes {
     #[oai(path = "/maptest/id/share", method = "get", tag = ApiTags::MapTestIdSystem)]
     pub async fn get_shareable_id(&self, id: Query<Option<u64>>) -> Result<IdResponse> {
         let id = match id.0 {
-            None => return Ok(IdResponse::InvalidId),
+            None => return Ok(IdResponse::InvalidId(Json(ApiError { error: "Query `id` is not a number (u64).".to_string() } ))),
             Some(b) => b,
         };
         let result = self.backend.get_shareable_id(id.to_string());
         match result {
             Ok(share_id) => Ok(IdResponse::Ok(PlainText(share_id))),
-            Err(e) => Ok(IdResponse::ServerError(PlainText(unbox_error(e))))
+            Err(e) => Ok(IdResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         }
     }
 
@@ -330,13 +264,13 @@ impl ApiRoutes {
         }
 
         let id = match id.0 {
-            Some(i) => i,
-            None => return Ok(IdResponse::InvalidId),
+            None => return Ok(IdResponse::InvalidId(Json(ApiError { error: "Query `id` is not a String.".to_string() } ))),
+            Some(b) => b,
         };
         let result = self.backend.get_number_id(id);
         match result {
             Ok(id) => Ok(IdResponse::Ok(PlainText(id.to_string()))),
-            Err(e) => Ok(IdResponse::ServerError(PlainText(unbox_error(e))))
+            Err(e) => Ok(IdResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         }
     }
 
