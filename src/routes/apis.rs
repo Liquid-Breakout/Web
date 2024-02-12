@@ -53,7 +53,7 @@ impl ApiRoutes {
         match result {
             Ok(entries) => {
                 // this is ugly, i wish there's a way to not do this
-                let mut response_entries: Vec<BanEntryObject> = vec![];
+                let mut response_entries: Vec<BanEntryObject> = Vec::new();
                 for entry in entries.into_iter() {
                     response_entries.push(BanEntryObject {
                         user_id: entry.user_id,
