@@ -1,4 +1,4 @@
-use full_moon::ast::Suffix;
+use full_moon::ast::{Call, Expression, FunctionArgs, Suffix};
 use poem::Result;
 use poem_openapi::{auth::ApiKey, param::Query, payload::Json, payload::PlainText, OpenApi, SecurityScheme};
 use line_col::LineColLookup;
@@ -189,19 +189,43 @@ impl ApiRoutes {
                 for ((pos, _), suffixes) in found_require.into_iter() {
                     if let Some(&suffix) = suffixes.first() {
                         match suffix {
-                            Suffix::Index(index) => {
-                                match index.to_string().parse::<u64>() {
-                                    Ok(id) => {
-                                        let (line, column) = lookup.get(pos);
-                                        result.push(MaliciousScriptEntry {
-                                            script: location.clone(),
-                                            line: line as u64,
-                                            column: column as u64,
-                                            reason: format!("Detected requiring by id ({}). This is used to download malicious scripts, thus is not allowed.", id),
-                                        })
+                            Suffix::Call(call) => {
+                                match call {
+                                    Call::MethodCall(method_call) => {
+                                        let args = if let FunctionArgs::Parentheses { arguments, .. } = method_call.args() {
+                                            arguments
+                                        } else {
+                                            return;
+                                        };
+                                        if args.is_empty() {
+                                            return;
+                                        }
+                                        let arg_pair = if let Some(arg) = args.first() {
+                                            arg
+                                        } else {
+                                            return;
+                                        };
+                                        let arg = arg_pair.value();
+                                        let index = if let Expression::Number(token) = arg {
+                                            token
+                                        } else {
+                                            return;
+                                        };
+                                        match index.to_string().parse::<u64>() {
+                                            Ok(id) => {
+                                                let (line, column) = lookup.get(pos);
+                                                result.push(MaliciousScriptEntry {
+                                                    script: location.clone(),
+                                                    line: line as u64,
+                                                    column: column as u64,
+                                                    reason: format!("Detected requiring by id ({}). This is used to download malicious scripts, thus is not allowed.", id),
+                                                })
+                                            },
+                                            Err(_) => {}
+                                        };
                                     },
-                                    Err(_) => {}
-                                };
+                                    _ => {}
+                                }
                             },
                             _ => {}
                         };
