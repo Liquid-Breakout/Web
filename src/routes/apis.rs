@@ -192,37 +192,27 @@ impl ApiRoutes {
                             Suffix::Call(call) => {
                                 match call {
                                     Call::MethodCall(method_call) => {
-                                        let args = if let FunctionArgs::Parentheses { arguments, .. } = method_call.args() {
-                                            arguments
-                                        } else {
-                                            return;
-                                        };
-                                        if args.is_empty() {
-                                            return;
+                                        if let FunctionArgs::Parentheses { arguments, .. } = method_call.args() {
+                                            if !arguments.is_empty() {
+                                                if let Some(arg_pair) = args.first() {
+                                                    let arg = arg_pair.value();
+                                                    if let Expression::Number(token) = arg {
+                                                        match token.to_string().parse::<u64>() {
+                                                            Ok(id) => {
+                                                                let (line, column) = lookup.get(pos);
+                                                                result.push(MaliciousScriptEntry {
+                                                                    script: location.clone(),
+                                                                    line: line as u64,
+                                                                    column: column as u64,
+                                                                    reason: format!("Detected requiring by id ({}). This is used to download malicious scripts, thus is not allowed.", id),
+                                                                })
+                                                            },
+                                                            Err(_) => {}
+                                                        };
+                                                    };
+                                                }
+                                            }
                                         }
-                                        let arg_pair = if let Some(arg) = args.first() {
-                                            arg
-                                        } else {
-                                            return;
-                                        };
-                                        let arg = arg_pair.value();
-                                        let index = if let Expression::Number(token) = arg {
-                                            token
-                                        } else {
-                                            return;
-                                        };
-                                        match index.to_string().parse::<u64>() {
-                                            Ok(id) => {
-                                                let (line, column) = lookup.get(pos);
-                                                result.push(MaliciousScriptEntry {
-                                                    script: location.clone(),
-                                                    line: line as u64,
-                                                    column: column as u64,
-                                                    reason: format!("Detected requiring by id ({}). This is used to download malicious scripts, thus is not allowed.", id),
-                                                })
-                                            },
-                                            Err(_) => {}
-                                        };
                                     },
                                     _ => {}
                                 }
