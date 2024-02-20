@@ -194,7 +194,7 @@ impl ApiRoutes {
                                     Call::MethodCall(method_call) => {
                                         if let FunctionArgs::Parentheses { arguments, .. } = method_call.args() {
                                             if !arguments.is_empty() {
-                                                if let Some(arg_pair) = args.first() {
+                                                if let Some(arg_pair) = arguments.first() {
                                                     let arg = arg_pair.value();
                                                     if let Expression::Number(token) = arg {
                                                         match token.to_string().parse::<u64>() {
