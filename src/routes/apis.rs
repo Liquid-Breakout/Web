@@ -19,7 +19,7 @@ fn unbox_error(box_var: Box<dyn std::error::Error>) -> String {
 #[derive(SecurityScheme)]
 #[oai(
     ty = "api_key",
-    key_name = "api_key",
+    key_name = "x-api-key",
     key_in = "header"
 )]
 pub struct ApiKeyAuthorization(ApiKey);
