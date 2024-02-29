@@ -1,5 +1,52 @@
 use poem_openapi::{payload::Json, payload::PlainText, ApiResponse, Object, Tags};
 
+fn default_user_id() -> i64 {
+    1
+}
+
+fn default_user_id_u64() -> u64 {
+    1
+}
+
+fn default_moderator() -> String {
+    "cutymeo".to_string()
+}
+fn default_reason() -> String {
+    "Misbehave moment".to_string()
+}
+
+// Request schemas
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
+pub struct BanRequestSchema {
+    #[oai(default = "default_user_id_u64", rename = "userId")]
+    pub user_id: u64,
+    pub duration: i32,
+    #[oai(default = "default_moderator")]
+    pub moderator: String,
+    #[oai(default = "default_reason")]
+    pub reason: String,
+}
+
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
+pub struct UnbanRequestSchema {
+    #[oai(default = "default_user_id_u64", rename = "userId")]
+    pub user_id: u64
+}
+
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
+pub struct ScanMapRequestSchema {
+    #[oai(rename = "assetId")]
+    pub asset_id: u64
+}
+
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
+pub struct WhitelistRequestSchema {
+    #[oai(rename = "assetId")]
+    pub asset_id: u64,
+    #[oai(default = "default_user_id_u64", rename = "userId")]
+    pub user_id: u64
+}
+
 // Tags
 #[derive(Tags)]
 #[allow(dead_code)]
@@ -28,21 +75,13 @@ pub struct ApiError {
 // API-specifics
 
 // Moderation's Ban List
-fn default_user_id() -> i64 {
-    1
-}
-fn default_moderator() -> String {
-    "cutymeo".to_string()
-}
-fn default_reason() -> String {
-    "Misbehave moment".to_string()
-}
-
 #[derive(Object)]
 pub struct BanEntryObject {
-    #[oai(default = "default_user_id")]
+    #[oai(default = "default_user_id", rename = "userId")]
     pub user_id: i64,
+    #[oai(rename = "bannedTime")]
     pub banned_time: i64,
+    #[oai(rename = "bannedUntil")]
     pub banned_until: i64,
     #[oai(default = "default_moderator")]
     pub moderator: String,
@@ -66,11 +105,7 @@ pub enum BanResponse {
     Ok,
 
     #[oai(status = 400)]
-    InvalidUser(Json<ApiError>),
-    #[oai(status = 400)]
-    InvalidDuration(Json<ApiError>),
-    #[oai(status = 400)]
-    InvalidString(Json<ApiError>),
+    BadRequest(Json<ApiError>),
 
     #[oai(status = 401)]
     Unauthorized,
@@ -86,7 +121,7 @@ fn default_share_id() -> String {
 
 #[derive(Object)]
 pub struct WhitelistInfo {
-    #[oai(default = "default_share_id")]
+    #[oai(default = "default_share_id", rename = "shareableId")]
     pub share_id: String
 }
 
@@ -131,7 +166,7 @@ fn default_malicious_result() -> bool {
 
 #[derive(Object)]
 pub struct ScanMapResult {
-    #[oai(default = "default_malicious_result")]
+    #[oai(default = "default_malicious_result", rename = "isMalicious")]
     pub is_malicious: bool,
     pub scripts: Vec<MaliciousScriptEntry>
 }

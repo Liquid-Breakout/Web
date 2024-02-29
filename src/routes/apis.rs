@@ -4,7 +4,7 @@ use poem_openapi::{auth::ApiKey, param::Query, payload::Json, payload::PlainText
 use line_col::LineColLookup;
 use liquid_breakout_backend::Backend;
 use super::generic::{GenericRoutes, WebsocketIoQueue};
-use super::structs::{ApiTags, ApiError, BanEntryObject, BanListResponse, BanResponse, IdResponse, MaliciousScriptEntry, ScanMapInfo, ScanMapResponse, ScanMapResult, WhitelistInfo, WhitelistResponse};
+use super::structs::{ApiError, ApiTags, BanEntryObject, BanListResponse, BanRequestSchema, BanResponse, IdResponse, MaliciousScriptEntry, ScanMapInfo, ScanMapRequestSchema, ScanMapResponse, ScanMapResult, UnbanRequestSchema, WhitelistInfo, WhitelistRequestSchema, WhitelistResponse};
 
 pub struct ApiRoutes {
     backend: Backend,
@@ -73,33 +73,21 @@ impl ApiRoutes {
     }
 
     #[oai(path = "/moderation/ban", method = "post", tag = ApiTags::Moderation)]
-    pub async fn ban_player(&self, api_key: ApiKeyAuthorization, user_id: Query<Option<u64>>, duration: Query<Option<i32>>, moderator: Query<Option<String>>, reason: Query<Option<String>>) -> Result<BanResponse> {
+    pub async fn ban_player(&self, api_key: ApiKeyAuthorization, body: Json<BanRequestSchema>) -> Result<BanResponse> {
         let authorized = self.authorized(api_key.0).await;
         if !authorized {
             return Ok(BanResponse::Unauthorized)
         }
 
-        let user_id = match user_id.0 {
-            Some(i) => i,
-            None => return Ok(BanResponse::InvalidUser(Json(ApiError { error: "Query `user_id` is not a number (u64).".to_string() }))),
-        };
-        let duration_in_minutes = match duration.0 {
-            Some(i) => i,
-            None => return Ok(BanResponse::InvalidDuration(Json(ApiError { error: "Query `duration` is not a number (i32).".to_string() }))),
-        };
-        if duration_in_minutes < 0 && duration_in_minutes != -1 {
-            return Ok(BanResponse::InvalidDuration(Json(ApiError { error: "`duration` can only be positive or -1.".to_string() })))
+        let body = body.0;
+        if body.user_id <= 0 {
+            return Ok(BanResponse::BadRequest(Json(ApiError { error: "userId cannot be negative or 0.".to_string() })))
         }
-        let moderator = match moderator.0 {
-            Some(i) => i,
-            None => return Ok(BanResponse::InvalidString(Json(ApiError { error: "Query `moderator` is not a String.".to_string() }))),
-        };
-        let reason = match reason.0 {
-            Some(i) => i,
-            None => return Ok(BanResponse::InvalidString(Json(ApiError { error: "Query `reason` is not a String.".to_string() }))),
-        };
+        if body.duration < 0 && body.duration != -1 {
+            return Ok(BanResponse::BadRequest(Json(ApiError { error: "duration can only be positive or -1.".to_string() })))
+        }
 
-        let result = self.backend.ban_player(user_id, duration_in_minutes, &moderator, &reason).await;
+        let result = self.backend.ban_player(body.user_id, body.duration, &body.moderator, &body.reason).await;
         match result {
             Ok(_) => Ok(BanResponse::Ok),
             Err(e) => Ok(BanResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
@@ -107,18 +95,18 @@ impl ApiRoutes {
     }
 
     #[oai(path = "/moderation/unban", method = "post", tag = ApiTags::Moderation)]
-    pub async fn unban_player(&self, api_key: ApiKeyAuthorization, user_id: Query<Option<u64>>) -> Result<BanResponse> {
+    pub async fn unban_player(&self, api_key: ApiKeyAuthorization, body: Json<UnbanRequestSchema>) -> Result<BanResponse> {
         let authorized = self.authorized(api_key.0).await;
         if !authorized {
             return Ok(BanResponse::Unauthorized)
         }
 
-        let user_id = match user_id.0 {
-            Some(i) => i,
-            None => return Ok(BanResponse::InvalidUser(Json(ApiError { error: "Query `user_id` is not a number (u64).".to_string() }))),
-        };
+        let body = body.0;
+        if body.user_id <= 0 {
+            return Ok(BanResponse::BadRequest(Json(ApiError { error: "userId cannot be negative or 0.".to_string() })))
+        }
 
-        let result = self.backend.unban_player(user_id).await;
+        let result = self.backend.unban_player(body.user_id).await;
         match result {
             Ok(_) => Ok(BanResponse::Ok),
             Err(e) => Ok(BanResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
@@ -127,18 +115,15 @@ impl ApiRoutes {
 
     // Map Test Scan Model
     #[oai(path = "/maptest/scanmap", method = "post", tag = ApiTags::MapTestOperation)]
-    pub async fn scan_map(&self, api_key: ApiKeyAuthorization, asset_id: Query<Option<u64>>) -> Result<ScanMapResponse> {
+    pub async fn scan_map(&self, api_key: ApiKeyAuthorization, body: Json<ScanMapRequestSchema>) -> Result<ScanMapResponse> {
         let authorized = self.authorized(api_key.0).await;
         if !authorized {
             return Ok(ScanMapResponse::Unauthorized)
         }
 
-        let asset_id = match asset_id.0 {
-            None => return Ok(ScanMapResponse::InvalidId(Json(ApiError { error: "Query `asset_id` is not a number (u64).".to_string() }))),
-            Some(b) => b,
-        };
+        let body = body.0;
 
-        let bytes = match self.backend.download_asset_bytes(asset_id).await {
+        let bytes = match self.backend.download_asset_bytes(body.asset_id).await {
             Ok(bytes) => bytes,
             Err(e) => return Ok(ScanMapResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         };
@@ -150,7 +135,6 @@ impl ApiRoutes {
 
         let scripts = self.backend.dom_find_scripts(&dom);
         let mut result: Vec<MaliciousScriptEntry> = Vec::new();
-
         for (location, src) in scripts.into_iter() {
             let ast = match self.backend.luau_ast_from_string(&src) {
                 Ok(ast) => ast,
@@ -160,7 +144,7 @@ impl ApiRoutes {
 
             let found_getfenv = self.backend.luau_find_global_function_usage(&ast, "getfenv");
             if !found_getfenv.is_empty() {
-                for ((pos, _), _) in found_getfenv.into_iter() {
+                for ((pos, _), _) in found_getfenv.clone().into_iter() {
                     let (line, column) = lookup.get(pos);
                     result.push(MaliciousScriptEntry {
                         script: location.clone(),
@@ -173,7 +157,7 @@ impl ApiRoutes {
 
             let found_setfenv = self.backend.luau_find_global_function_usage(&ast, "setfenv");
             if !found_setfenv.is_empty() {
-                for ((pos, _), _) in found_setfenv.into_iter() {
+                for ((pos, _), _) in found_setfenv.clone().into_iter() {
                     let (line, column) = lookup.get(pos);
                     result.push(MaliciousScriptEntry {
                         script: location.clone(),
@@ -186,39 +170,30 @@ impl ApiRoutes {
 
             let found_require = self.backend.luau_find_global_function_usage(&ast, "require");
             if !found_require.is_empty() {
-                for ((pos, _), suffixes) in found_require.into_iter() {
+                for ((pos, _), suffixes) in found_require.clone().into_iter() {
                     if let Some(&suffix) = suffixes.first() {
-                        match suffix {
-                            Suffix::Call(call) => {
-                                match call {
-                                    Call::MethodCall(method_call) => {
-                                        if let FunctionArgs::Parentheses { arguments, .. } = method_call.args() {
-                                            if !arguments.is_empty() {
-                                                if let Some(arg_pair) = arguments.first() {
-                                                    let arg = arg_pair.value();
-                                                    if let Expression::Number(token) = arg {
-                                                        match token.to_string().parse::<u64>() {
-                                                            Ok(id) => {
-                                                                let (line, column) = lookup.get(pos);
-                                                                result.push(MaliciousScriptEntry {
-                                                                    script: location.clone(),
-                                                                    line: line as u64,
-                                                                    column: column as u64,
-                                                                    reason: format!("Detected requiring by id ({}). This is used to download malicious scripts, thus is not allowed.", id),
-                                                                })
-                                                            },
-                                                            Err(_) => {}
-                                                        };
-                                                    };
+                        if let Suffix::Call(call) = suffix {
+                            if let Call::MethodCall(method_call) = call {
+                                if let FunctionArgs::Parentheses { arguments, .. } = method_call.args() {
+                                    if !arguments.is_empty() {
+                                        if let Some(arg_pair) = arguments.first() {
+                                            let arg = arg_pair.value();
+                                            if let Expression::Number(token) = arg {
+                                                if let Ok(id) = token.to_string().parse::<u64>() {
+                                                    let (line, column) = lookup.get(pos);
+                                                    result.push(MaliciousScriptEntry {
+                                                        script: location.clone(),
+                                                        line: line as u64,
+                                                        column: column as u64,
+                                                        reason: format!("Detected requiring by id ({}). This is used to download malicious scripts, thus is not allowed.", id),
+                                                    })
                                                 }
-                                            }
+                                            };
                                         }
-                                    },
-                                    _ => {}
+                                    }
                                 }
-                            },
-                            _ => {}
-                        };
+                            } 
+                        }
                     }
                 }
             }
@@ -236,22 +211,15 @@ impl ApiRoutes {
 
     // Map Test Whitelist
     #[oai(path = "/maptest/whitelist", method = "post", tag = ApiTags::MapTestOperation)]
-    pub async fn whitelist(&self, asset_id: Query<Option<u64>>, user_id: Query<Option<u64>>) -> Result<WhitelistResponse> {
-        let asset_id = match asset_id.0 {
-            None => return Ok(WhitelistResponse::BadRequest(Json(ApiError { error: "Query `asset_id` is not a number (u64).".to_string() }))),
-            Some(b) => b,
-        };
-        let user_id = match user_id.0 {
-            None => return Ok(WhitelistResponse::BadRequest(Json(ApiError { error: "Query `user_id` is not a number (u64).".to_string() }))),
-            Some(b) => b,
-        };
-        if user_id <= 0 {
-            return Ok(WhitelistResponse::BadRequest(Json(ApiError { error: "`user_id` cannot be negative or 0.".to_string() })))
+    pub async fn whitelist(&self, body: Json<WhitelistRequestSchema>) -> Result<WhitelistResponse> {
+        let body = body.0;
+        if body.user_id <= 0 {
+            return Ok(WhitelistResponse::BadRequest(Json(ApiError { error: "userId cannot be negative or 0.".to_string() })))
         }
 
-        let result = self.backend.whitelist_asset(asset_id, user_id).await;
+        let result = self.backend.whitelist_asset(body.asset_id, body.user_id).await;
         match result {
-            Ok(_) => Ok(WhitelistResponse::Ok(Json(WhitelistInfo { share_id: self.backend.get_shareable_id(asset_id.to_string()).unwrap() }))),
+            Ok(_) => Ok(WhitelistResponse::Ok(Json(WhitelistInfo { share_id: self.backend.get_shareable_id(body.asset_id.to_string()).unwrap() }))),
             Err(e) => Ok(WhitelistResponse::ServerError(Json(ApiError { error: unbox_error(e) } )))
         }
     }
