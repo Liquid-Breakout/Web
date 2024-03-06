@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, sync::Arc};
 use poem::{listener::TcpListener, Route};
 use poem_openapi::OpenApiService;
 use routes::{apis::ApiRoutes, generic::GenericRoutes};
@@ -28,8 +28,8 @@ async fn main() -> Result<(), std::io::Error> {
         Err(e) => panic!("Server cannot start: Failed to connect to MongoDB, reason: {}", (*e).to_string())
     }
 
-    let generic_routes = GenericRoutes::new();
-    let api_routes = ApiRoutes::new(backend, &generic_routes);
+    let generic_routes = Arc::new(GenericRoutes::new());
+    let api_routes = ApiRoutes::new(backend, generic_routes.clone());
 
     let api_service = OpenApiService::new(api_routes, "Liquid Breakout API", "0.0.1")
         .server("https://api.liquidbreakout.com/v1");

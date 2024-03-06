@@ -1,14 +1,15 @@
+use std::sync::Arc;
 use full_moon::ast::{Call, Expression, FunctionArgs, Suffix};
 use poem::Result;
 use poem_openapi::{auth::ApiKey, param::Query, payload::Json, payload::PlainText, OpenApi, SecurityScheme};
 use line_col::LineColLookup;
 use liquid_breakout_backend::Backend;
-use super::generic::{GenericRoutes, WebsocketIoQueue};
-use super::structs::{ApiError, ApiTags, BanEntryObject, BanListResponse, BanRequestSchema, BanResponse, IdResponse, MaliciousScriptEntry, ScanMapInfo, ScanMapRequestSchema, ScanMapResponse, ScanMapResult, UnbanRequestSchema, WhitelistInfo, WhitelistRequestSchema, WhitelistResponse};
+use super::generic::{GenericRoutes, WebsocketIoStruct};
+use super::structs::{ApiError, ApiTags, BanEntryObject, BanListResponse, BanRequestSchema, BanResponse, IdResponse, IoResponse, IoSendSchema, IoSendBatchSchema, MaliciousScriptEntry, ScanMapInfo, ScanMapRequestSchema, ScanMapResponse, ScanMapResult, UnbanRequestSchema, WhitelistInfo, WhitelistRequestSchema, WhitelistResponse};
 
 pub struct ApiRoutes {
     backend: Backend,
-    generic_routes: GenericRoutes
+    generic_routes: Arc<GenericRoutes>
 }
 
 fn unbox_error(box_var: Box<dyn std::error::Error>) -> String {
@@ -26,8 +27,8 @@ pub struct ApiKeyAuthorization(ApiKey);
 
 #[OpenApi]
 impl ApiRoutes {
-    pub fn new(backend: Backend, generic_routes: &GenericRoutes) -> Self {
-        Self { backend: backend, generic_routes: generic_routes.to_owned() }
+    pub fn new(backend: Backend, generic_routes: Arc<GenericRoutes>) -> Self {
+        Self { backend: backend, generic_routes: generic_routes }
     }
 
     pub async fn authorized(&self, api_key: ApiKey) -> bool {
@@ -41,10 +42,44 @@ impl ApiRoutes {
     }
 
     // IO-related
-    /*#[oai(path = "/websocket/io/send", method = "post")]
-    pub async fn io_send(&self, action: Header<String>, bgm: Query<Option<String>>, ) {
-        
-    }*/
+    #[oai(path = "/websocket/io/send", method = "post")]
+    pub async fn io_send(&self, api_key: ApiKeyAuthorization, body: Json<IoSendSchema>) -> Result<IoResponse> {
+        let authorized = self.authorized(api_key.0).await;
+        if !authorized {
+            return Ok(IoResponse::Unauthorized)
+        }
+
+        let mut io_queue_mutex = self.generic_routes.websocket_io_queue.lock().unwrap();
+        (*io_queue_mutex).push(WebsocketIoStruct {
+            client: body.username.clone(),
+            action: body.action.clone(),
+            bgm: body.bgm.clone(),
+            start_time: body.utc_time
+        });
+
+        Ok(IoResponse::Ok)
+    }
+
+    #[oai(path = "/websocket/io/send_batch", method = "post")]
+    pub async fn io_send_batch(&self, api_key: ApiKeyAuthorization, body: Json<IoSendBatchSchema>) -> Result<IoResponse> {
+        let authorized = self.authorized(api_key.0).await;
+        if !authorized {
+            return Ok(IoResponse::Unauthorized)
+        }
+
+        let mut io_queue_mutex = self.generic_routes.websocket_io_queue.lock().unwrap();
+        for username in body.usernames.iter() {
+            (*io_queue_mutex).push(WebsocketIoStruct {
+                client: username.clone(),
+                action: body.action.clone(),
+                bgm: body.bgm.clone(),
+                start_time: body.utc_time
+            });
+        }
+
+        Ok(IoResponse::Ok)
+    }
+
 
     // Moderation System
     #[oai(path = "/moderation/ban/list", method = "get", tag = ApiTags::Moderation)]

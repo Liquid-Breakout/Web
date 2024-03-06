@@ -17,6 +17,22 @@ fn default_reason() -> String {
 
 // Request schemas
 #[derive(Debug, Object, Clone, Eq, PartialEq)]
+pub struct IoSendSchema {
+    pub username: String,
+    pub action: String,
+    pub bgm: Option<String>,
+    pub utc_time: Option<u64>,
+}
+
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
+pub struct IoSendBatchSchema {
+    pub usernames: Vec<String>,
+    pub action: String,
+    pub bgm: Option<String>,
+    pub utc_time: Option<u64>,
+}
+
+#[derive(Debug, Object, Clone, Eq, PartialEq)]
 pub struct BanRequestSchema {
     #[oai(default = "default_user_id_u64", rename = "userId")]
     pub user_id: u64,
@@ -73,6 +89,15 @@ pub struct ApiError {
 }
 
 // API-specifics
+
+#[derive(ApiResponse)]
+pub enum IoResponse {
+    #[oai(status = 200)]
+    Ok,
+
+    #[oai(status = 401)]
+    Unauthorized
+}
 
 // Moderation's Ban List
 #[derive(Object)]
