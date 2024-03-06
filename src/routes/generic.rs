@@ -19,8 +19,7 @@ pub struct WebsocketIoStruct {
 
 #[handler]
 fn websocket(
-    Path(join_type): Path<String>,
-    Path(username): Path<String>,
+    Path((join_type, username)): Path<(String, String)>,
     ws: WebSocket,
     websocket_io_queue: Data<&Arc<Mutex<Vec<WebsocketIoStruct>>>>,
     sender: Data<&tokio::sync::broadcast::Sender<String>>
